@@ -8,15 +8,14 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="LingoCurve">
-    <link rel="apple-touch-icon" href="icon.png">
 
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
     <style>
         :root { --primary: #4CAF50; --secondary: #f44336; --bg: #f9f9f9; }
         body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         
-        /* Feature 1: Last Updated Style */
-        #status-bar { font-size: 12px; color: #999; margin-bottom: 10px; text-align: center; }
+        /* FEATURE: Last Updated Style */
+        #status-bar { font-size: 11px; color: #999; margin-bottom: 10px; text-align: center; font-family: monospace; }
         
         #header { margin-bottom: 15px; font-weight: bold; color: #555; text-align: center; }
         #selector-container { margin-bottom: 20px; text-align: center; width: 100%; }
@@ -32,12 +31,13 @@
         button { flex: 1; padding: 18px; border: none; border-radius: 12px; color: white; font-size: 18px; font-weight: bold; cursor: pointer; }
         .yes-btn { background-color: var(--primary); }
         .no-btn { background-color: var(--secondary); }
-        #reminder { display: none; text-align: center; font-size: 20px; margin-top: 50px; line-height: 1.5; color: #333; }
+        #reminder { display: none; text-align: center; font-size: 18px; margin-top: 50px; line-height: 1.6; color: #333; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .review-date { color: var(--secondary); font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <div id="status-bar">Checking for updates...</div>
+    <div id="status-bar">Syncing...</div>
     <div id="header">Loading Vocabulary...</div>
 
     <div id="selector-container">
@@ -61,11 +61,14 @@
     <div id="reminder"></div>
 
     <script>
-        // Pointing to your uploaded GitHub file
         const CSV_FILE = 'glossary.csv';
         let allData = [];
         let currentSessionCards = [];
         let currentIndex = 0;
+        let activeNoteDay = null;
+
+        // FEATURE: Ebbinghaus Interval Logic
+        const intervals = [1, 2, 4, 7, 14, 28, 90];
 
         function formatDate(dateStr) {
             const date = new Date(dateStr);
@@ -76,15 +79,14 @@
             return `${y}-${m}-${d}`;
         }
 
-        // Fetch local CSV and show "Last Updated"
         Papa.parse(CSV_FILE, {
             download: true,
             header: false,
             skipEmptyLines: true,
             complete: function(results) {
-                // Feature 1: Display timestamp based on the last row's date or current time
+                // FEATURE: Last Updated Timestamp
                 const now = new Date();
-                document.getElementById('status-bar').innerText = `Glossary Sync: ${now.toLocaleDateString()} ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+                document.getElementById('status-bar').innerText = `UPDATED: ${now.toLocaleDateString()} ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
 
                 allData = results.data.slice(1)
                     .filter(row => row[1] && row[2]) 
@@ -103,18 +105,15 @@
                     selector.appendChild(option);
                 });
                 document.getElementById('header').innerText = "Select a Note Day";
-            },
-            error: function() {
-                document.getElementById('status-bar').innerText = "Sync Error: glossary.csv not found.";
             }
         });
 
         function startSession() {
-            const selectedDate = document.getElementById('date-selector').value;
-            if (!selectedDate) return;
+            activeNoteDay = document.getElementById('date-selector').value;
+            if (!activeNoteDay) return;
             currentSessionCards = allData
-                .filter(item => item.date === selectedDate)
-                .sort(() => Math.random() - 0.5);
+                .filter(item => item.date === activeNoteDay)
+                .sort(() => Math.random() - 0.5); // Random Order [cite: 19]
             currentIndex = 0;
             document.getElementById('selector-container').style.display = 'none';
             document.getElementById('status-bar').style.display = 'none';
@@ -125,15 +124,15 @@
         function showCard() {
             const currentData = currentSessionCards[currentIndex];
             document.getElementById('header').innerText = `${currentData.date} (${currentIndex + 1}/${currentSessionCards.length})`;
-            document.getElementById('front-text').innerText = currentData.chinese;
-            document.getElementById('back-text').innerText = currentData.english;
+            document.getElementById('front-text').innerText = currentData.chinese; // Default Chinese [cite: 13]
+            document.getElementById('back-text').innerText = currentData.english;  // Flip for English [cite: 14]
             document.getElementById('card').classList.remove('flipped');
             document.getElementById('controls').style.display = 'none';
         }
 
         function flipCard() {
             document.getElementById('card').classList.add('flipped');
-            document.getElementById('controls').style.display = 'flex';
+            document.getElementById('controls').style.display = 'flex'; // Show Yes/No [cite: 15]
         }
 
         function nextCard() {
@@ -145,16 +144,34 @@
             }
         }
 
+        // FEATURE: Dynamic Ebbinghaus Reminder Calculation
         function showReminder() {
             document.getElementById('card-container').style.display = 'none';
             document.getElementById('controls').style.display = 'none';
             document.getElementById('header').style.display = 'none';
+            
+            const start = new Date(activeNoteDay);
+            const today = new Date();
+            const diffDays = Math.floor((today - start) / (1000 * 60 * 60 * 24));
+            
+            // Find the next scheduled test day
+            let nextInterval = intervals.find(days => days > diffDays);
+            let nextDate = new Date(start);
+            
+            let message = "";
+            if (nextInterval) {
+                nextDate.setDate(start.getDate() + nextInterval);
+                message = `Your next review for this set is scheduled for:<br><span class="review-date">${nextDate.toDateString()}</span><br>(Review Day ${intervals.indexOf(nextInterval) + 1})`;
+            } else {
+                message = "Congratulations! You have finished the 90-day Ebbinghaus cycle for this set.";
+            }
+
             const reminderDiv = document.getElementById('reminder');
             reminderDiv.style.display = 'block';
             reminderDiv.innerHTML = `
                 <strong>Session Complete!</strong><br><br>
-                Next review in <strong>2 days</strong>.<br><br>
-                <button onclick="location.reload()" style="background:#444; width:auto; padding:12px 24px;">New Session</button>
+                ${message}<br><br>
+                <button onclick="location.reload()" style="background:#444; width:auto; padding:12px 24px;">Back to Menu</button>
             `;
         }
     </script>
