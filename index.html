@@ -39,44 +39,51 @@
 
     <div id="reminder"></div>
 
-    <script>
-        const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRlw2q97jLEUwmjCO_HsvPbDyeJIH4o7_qomsEz1GCLLVmZCm1sYP8XSGlDXjTHWCjXeU_2DaSXWAs/pub?gid=949570896&single=true&output=csv';
-        let cards = [];
-        let currentIndex = 0;
-        let todayStr = new Date().toISOString().split('T')[0].replace(/-/g, '/'); // Matches YYYY/M/D roughly
+	<script>
+		const CSV_URL = 'https://docs.google.com';
+		let cards = [];
+		let currentIndex = 0;
 
-        // In a real scenario, we'd match the specific note_day. 
-        // For this demo, we will use the most recent date found in the CSV.
-        
-        Papa.parse(CSV_URL, {
-            download: true,
-            header: false,
-            complete: function(results) {
-                const data = results.data.slice(1); // Remove header
-                // Filter: Column A (0) is note_day, B (1) is Chinese, C (2) is English. Skip blanks.
-                const validRows = data.filter(row => row[0] && row[1] && row[2]);
-                
-                // Get unique dates and pick the "current" one (e.g., 2026/3/20)
-                const targetDate = validRows[validRows.length - 1][0]; 
-                cards = validRows.filter(row => row[0] === targetDate)
-                                 .sort(() => Math.random() - 0.5); // Randomize
-                
-                if(cards.length > 0) {
-                    showCard();
-                } else {
-                    document.getElementById('header').innerText = "No tests for today.";
-                }
-            }
-        });
+		// 1. Fetch CSV using PapaParse with improved error handling
+		Papa.parse(CSV_URL, {
+			download: true,
+			header: false,
+			skipEmptyLines: true,
+			complete: function(results) {
+				const data = results.data.slice(1); // Skip header row
+				
+				// 2. Identify the target date (using the most recent date in the sheet)
+				// Adjust this if you want to hardcode a specific date like "2026/3/20"
+				const uniqueDates = [...new Set(data.map(row => row[0]))].filter(d => d);
+				const latestDate = uniqueDates[uniqueDates.length - 1];
 
-        function showCard() {
-            const cardData = cards[currentIndex];
-            document.getElementById('header').innerText = `${cardData[0]} round1`;
-            document.getElementById('front-text').innerText = cardData[1]; // Chinese
-            document.getElementById('back-text').innerText = cardData[2];  // English
-            document.getElementById('card').classList.remove('flipped');
-            document.getElementById('controls').style.display = 'none';
-        }
+				// 3. Filter for valid rows on that date (ignore blanks in B or C)
+				cards = data.filter(row => row[0] === latestDate && row[1] && row[2])
+							.sort(() => Math.random() - 0.5); // Randomize order
+
+				if (cards.length > 0) {
+					showCard();
+				} else {
+					document.getElementById('header').innerText = "No cards found for today.";
+				}
+			},
+			error: function(err) {
+				document.getElementById('header').innerText = "Error loading data. Check CSV link.";
+				console.error(err);
+			}
+		});
+
+		function showCard() {
+			const cardData = cards[currentIndex];
+			document.getElementById('header').innerText = `${cardData[0]} round1`;
+			document.getElementById('front-text').innerText = cardData[1]; // Chinese (Col B)
+			document.getElementById('back-text').innerText = cardData[2];  // English (Col C)
+			document.getElementById('card').classList.remove('flipped');
+			document.getElementById('controls').style.display = 'none';
+		}
+
+		// Keep the rest of your existing functions (flipCard, nextCard, showReminder) as is.
+
 
         function flipCard() {
             document.getElementById('card').classList.add('flipped');
