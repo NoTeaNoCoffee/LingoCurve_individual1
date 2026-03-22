@@ -4,27 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LingoCurve_individual1</title>
-    <!-- 1. Load the library FIRST -->
-    <script src="https://cdnjs.cloudflare.com"></script>
     <style>
         :root { --primary: #4CAF50; --secondary: #f44336; --bg: #f9f9f9; }
         body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); display: flex; flex-direction: column; align-items: center; height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
-        #header { margin-bottom: 20px; font-weight: bold; color: #555; }
+        #header { margin-bottom: 20px; font-weight: bold; color: #555; text-align: center; }
         #card-container { width: 100%; max-width: 400px; height: 250px; perspective: 1000px; cursor: pointer; }
         .card { width: 100%; height: 100%; position: relative; transition: transform 0.6s; transform-style: preserve-3d; border: 1px solid #ddd; border-radius: 12px; background: white; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
         .card.flipped { transform: rotateY(180deg); }
         .card-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; align-items: center; justify-content: center; font-size: 24px; padding: 20px; box-sizing: border-box; text-align: center; }
         .card-back { transform: rotateY(180deg); background-color: #fffdf5; }
         #controls { margin-top: 30px; display: none; gap: 20px; width: 100%; max-width: 400px; }
-        button { flex: 1; padding: 15px; border: none; border-radius: 8px; color: white; font-size: 18px; font-weight: bold; cursor: pointer; }
+        button { flex: 1; padding: 15px; border: none; border-radius: 8px; color: white; font-size: 18px; font-weight: bold; cursor: pointer; -webkit-tap-highlight-color: transparent; }
         .yes-btn { background-color: var(--primary); }
         .no-btn { background-color: var(--secondary); }
-        #reminder { display: none; text-align: center; font-size: 20px; margin-top: 50px; }
+        #reminder { display: none; text-align: center; font-size: 20px; margin-top: 50px; line-height: 1.5; color: #333; }
     </style>
 </head>
 <body>
 
-    <div id="header">Syncing with CSV...</div>
+    <div id="header">Fetching Latest Data...</div>
 
     <div id="card-container" onclick="flipCard()">
         <div class="card" id="card">
@@ -41,67 +39,69 @@
     <div id="reminder"></div>
 
     <script>
-        // 2. Wait for the browser to be fully ready
-        document.addEventListener('DOMContentLoaded', function() {
-            const CSV_URL = 'https://docs.google.com';
-            let cards = [];
-            let currentIndex = 0;
+        const CSV_URL = 'https://docs.google.com';
+        let cards = [];
+        let currentIndex = 0;
 
-            Papa.parse(CSV_URL, {
-                download: true,
-                header: false,
-                skipEmptyLines: true,
-                complete: function(results) {
-                    const rawData = results.data.slice(1); 
-                    // Use a fallback for target date if one isn't specified
-                    const uniqueDates = [...new Set(rawData.map(row => row[0]))].filter(d => d);
-                    const targetDate = uniqueDates[uniqueDates.length - 1];
+        // Fetch CSV using native JavaScript
+        fetch(CSV_URL)
+            .then(response => response.text())
+            .then(text => {
+                const rows = text.split('\n').map(row => row.split(','));
+                const data = rows.slice(1).filter(row => row.length >= 3 && row[1] && row[2]); // Filter valid rows
+                
+                // Get the most recent note_day from the sheet
+                const uniqueDates = [...new Set(data.map(row => row[0].trim()))].filter(d => d);
+                const latestDate = uniqueDates[uniqueDates.length - 1];
 
-                    cards = rawData.filter(row => row[0] === targetDate && row[1] && row[2])
-                                   .sort(() => Math.random() - 0.5);
+                // Filter for today's cards and randomize
+                cards = data.filter(row => row[0].trim() === latestDate)
+                            .sort(() => Math.random() - 0.5);
 
-                    if(cards.length > 0) {
-                        showCard();
-                    } else {
-                        document.getElementById('header').innerText = "No test data available.";
-                    }
-                },
-                error: function(err) {
-                    document.getElementById('header').innerText = "Sync failed. Check connection.";
-                }
-            });
-
-            window.showCard = function() {
-                const data = cards[currentIndex];
-                document.getElementById('header').innerText = `${data[0]} Round 1`;
-                document.getElementById('front-text').innerText = data[1]; // Column B
-                document.getElementById('back-text').innerText = data[2];  // Column C
-                document.getElementById('card').classList.remove('flipped');
-                document.getElementById('controls').style.display = 'none';
-            };
-
-            window.flipCard = function() {
-                document.getElementById('card').classList.add('flipped');
-                document.getElementById('controls').style.display = 'flex';
-            };
-
-            window.nextCard = function() {
-                currentIndex++;
-                if (currentIndex < cards.length) {
+                if (cards.length > 0) {
                     showCard();
                 } else {
-                    showReminder();
+                    document.getElementById('header').innerText = "No data found for: " + latestDate;
                 }
-            };
+            })
+            .catch(err => {
+                document.getElementById('header').innerText = "Sync Error: Please ensure your Sheet is 'Published to the Web' as a CSV.";
+                console.error(err);
+            });
 
-            window.showReminder = function() {
-                document.getElementById('card-container').style.display = 'none';
-                document.getElementById('controls').style.display = 'none';
-                document.getElementById('header').style.display = 'none';
-                document.getElementById('reminder').style.display = 'block';
-                document.getElementById('reminder').innerText = "Session Complete! Next review based on Ebbinghaus curve: March 24, 2026";
-            };
-        });
+        function showCard() {
+            const currentData = cards[currentIndex];
+            document.getElementById('header').innerText = `${currentData[0]} - Card ${currentIndex + 1}/${cards.length}`;
+            document.getElementById('front-text').innerText = currentData[1]; // Chinese
+            document.getElementById('back-text').innerText = currentData[2];  // English
+            document.getElementById('card').classList.remove('flipped');
+            document.getElementById('controls').style.display = 'none';
+        }
+
+        function flipCard() {
+            document.getElementById('card').classList.add('flipped');
+            document.getElementById('controls').style.display = 'flex';
+        }
+
+        function nextCard() {
+            currentIndex++;
+            if (currentIndex < cards.length) {
+                showCard();
+            } else {
+                showReminder();
+            }
+        }
+
+        function showReminder() {
+            document.getElementById('card-container').style.display = 'none';
+            document.getElementById('controls').style.display = 'none';
+            document.getElementById('header').style.display = 'none';
+            
+            // Basic Ebbinghaus reminder (Next review in 2 days)
+            const reminderDiv = document.getElementById('reminder');
+            reminderDiv.style.display = 'block';
+            reminderDiv.innerHTML = `<strong>Session Complete!</strong><br><br>Based on the Ebbinghaus curve,<br>your next review for this set is in 2 days.`;
+        }
     </script>
 </body>
 </html>
