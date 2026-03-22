@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LingoCurve_individual1</title>
+    <script src="https://cdnjs.cloudflare.com"></script>
+    <style>
+        :root { --primary: #4CAF50; --secondary: #f44336; --bg: #f9f9f9; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); display: flex; flex-direction: column; align-items: center; height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+        #header { margin-bottom: 20px; font-weight: bold; color: #555; }
+        #card-container { width: 100%; max-width: 400px; height: 250px; perspective: 1000px; cursor: pointer; }
+        .card { width: 100%; height: 100%; position: relative; transition: transform 0.6s; transform-style: preserve-3d; border: 1px solid #ddd; border-radius: 12px; background: white; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .card.flipped { transform: rotateY(180deg); }
+        .card-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; align-items: center; justify-content: center; font-size: 24px; padding: 20px; box-sizing: border-box; text-align: center; }
+        .card-back { transform: rotateY(180deg); }
+        #controls { margin-top: 30px; display: none; gap: 20px; width: 100%; max-width: 400px; }
+        button { flex: 1; padding: 15px; border: none; border-radius: 8px; color: white; font-size: 18px; font-weight: bold; cursor: pointer; }
+        .yes-btn { background-color: var(--primary); }
+        .no-btn { background-color: var(--secondary); }
+        #reminder { display: none; text-align: center; font-size: 20px; margin-top: 50px; }
+    </style>
+</head>
+<body>
+
+    <div id="header">Loading...</div>
+
+    <div id="card-container" onclick="flipCard()">
+        <div class="card" id="card">
+            <div class="card-face card-front" id="front-text"></div>
+            <div class="card-face card-back" id="back-text"></div>
+        </div>
+    </div>
+
+    <div id="controls">
+        <button class="yes-btn" onclick="nextCard()">Yes</button>
+        <button class="no-btn" onclick="nextCard()">No</button>
+    </div>
+
+    <div id="reminder"></div>
+
+    <script>
+        const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRlw2q97jLEUwmjCO_HsvPbDyeJIH4o7_qomsEz1GCLLVmZCm1sYP8XSGlDXjTHWCjXeU_2DaSXWAs/pub?gid=949570896&single=true&output=csv';
+        let cards = [];
+        let currentIndex = 0;
+        let todayStr = new Date().toISOString().split('T')[0].replace(/-/g, '/'); // Matches YYYY/M/D roughly
+
+        // In a real scenario, we'd match the specific note_day. 
+        // For this demo, we will use the most recent date found in the CSV.
+        
+        Papa.parse(CSV_URL, {
+            download: true,
+            header: false,
+            complete: function(results) {
+                const data = results.data.slice(1); // Remove header
+                // Filter: Column A (0) is note_day, B (1) is Chinese, C (2) is English. Skip blanks.
+                const validRows = data.filter(row => row[0] && row[1] && row[2]);
+                
+                // Get unique dates and pick the "current" one (e.g., 2026/3/20)
+                const targetDate = validRows[validRows.length - 1][0]; 
+                cards = validRows.filter(row => row[0] === targetDate)
+                                 .sort(() => Math.random() - 0.5); // Randomize
+                
+                if(cards.length > 0) {
+                    showCard();
+                } else {
+                    document.getElementById('header').innerText = "No tests for today.";
+                }
+            }
+        });
+
+        function showCard() {
+            const cardData = cards[currentIndex];
+            document.getElementById('header').innerText = `${cardData[0]} round1`;
+            document.getElementById('front-text').innerText = cardData[1]; // Chinese
+            document.getElementById('back-text').innerText = cardData[2];  // English
+            document.getElementById('card').classList.remove('flipped');
+            document.getElementById('controls').style.display = 'none';
+        }
+
+        function flipCard() {
+            document.getElementById('card').classList.add('flipped');
+            document.getElementById('controls').style.display = 'flex';
+        }
+
+        function nextCard() {
+            currentIndex++;
+            if (currentIndex < cards.length) {
+                showCard();
+            } else {
+                showReminder();
+            }
+        }
+
+        function showReminder() {
+            document.getElementById('card-container').style.display = 'none';
+            document.getElementById('controls').style.display = 'none';
+            document.getElementById('header').style.display = 'none';
+            
+            // Logic: Ebbinghaus typically suggests next review in 2 days for the first interval
+            const nextDate = "2026/3/22"; 
+            const reminderDiv = document.getElementById('reminder');
+            reminderDiv.style.display = 'block';
+            reminderDiv.innerHTML = `The next test day is ${nextDate}`;
+        }
+    </script>
+</body>
+</html>
