@@ -4,33 +4,45 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LingoCurve_individual1</title>
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="LingoCurve">
+    <link rel="apple-touch-icon" href="icon.png">
+
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
     <style>
         :root { --primary: #4CAF50; --secondary: #f44336; --bg: #f9f9f9; }
-        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
-        #header { margin-bottom: 15px; font-weight: bold; color: #555; text-align: center; min-height: 24px; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
+        /* Feature 1: Last Updated Style */
+        #status-bar { font-size: 12px; color: #999; margin-bottom: 10px; text-align: center; }
+        
+        #header { margin-bottom: 15px; font-weight: bold; color: #555; text-align: center; }
         #selector-container { margin-bottom: 20px; text-align: center; width: 100%; }
-        /* Improved select for iOS touch */
-        select { padding: 12px; border-radius: 8px; border: 1px solid #ddd; font-size: 16px; background: white; width: 80%; max-width: 300px; appearance: none; -webkit-appearance: none; }
-        #card-container { width: 100%; max-width: 400px; height: 250px; perspective: 1000px; cursor: pointer; display: none; }
-        .card { width: 100%; height: 100%; position: relative; transition: transform 0.6s; transform-style: preserve-3d; border: 1px solid #ddd; border-radius: 12px; background: white; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        select { padding: 12px; border-radius: 8px; border: 1px solid #ddd; font-size: 16px; background: white; width: 85%; max-width: 300px; -webkit-appearance: none; }
+        
+        #card-container { width: 100%; max-width: 400px; height: 250px; perspective: 1000px; display: none; }
+        .card { width: 100%; height: 100%; position: relative; transition: transform 0.4s; transform-style: preserve-3d; border: 1px solid #ddd; border-radius: 12px; background: white; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
         .card.flipped { transform: rotateY(180deg); }
         .card-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; align-items: center; justify-content: center; font-size: 24px; padding: 20px; box-sizing: border-box; text-align: center; }
         .card-back { transform: rotateY(180deg); background-color: #fffdf5; }
+        
         #controls { margin-top: 30px; display: none; gap: 20px; width: 100%; max-width: 400px; }
-        button { flex: 1; padding: 18px; border: none; border-radius: 12px; color: white; font-size: 18px; font-weight: bold; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+        button { flex: 1; padding: 18px; border: none; border-radius: 12px; color: white; font-size: 18px; font-weight: bold; cursor: pointer; }
         .yes-btn { background-color: var(--primary); }
         .no-btn { background-color: var(--secondary); }
-        #reminder { display: none; text-align: center; font-size: 20px; margin-top: 50px; line-height: 1.5; color: #333; padding: 20px; }
+        #reminder { display: none; text-align: center; font-size: 20px; margin-top: 50px; line-height: 1.5; color: #333; }
     </style>
 </head>
 <body>
 
-    <div id="header">Syncing Glossary...</div>
+    <div id="status-bar">Checking for updates...</div>
+    <div id="header">Loading Vocabulary...</div>
 
     <div id="selector-container">
         <select id="date-selector" onchange="startSession()">
-            <option value="">-- Select a Note Day --</option>
+            <option value="">-- Choose a Note Day --</option>
         </select>
     </div>
 
@@ -49,8 +61,8 @@
     <div id="reminder"></div>
 
     <script>
-        // Updated URL and improved fetching for Safari
-        const CSV_URL = 'glossary.csv';
+        // Pointing to your uploaded GitHub file
+        const CSV_FILE = 'glossary.csv';
         let allData = [];
         let currentSessionCards = [];
         let currentIndex = 0;
@@ -64,16 +76,15 @@
             return `${y}-${m}-${d}`;
         }
 
-        // Use Papa.parse with explicit configuration for better iOS support
-        Papa.parse(CSV_URL, {
+        // Fetch local CSV and show "Last Updated"
+        Papa.parse(CSV_FILE, {
             download: true,
             header: false,
             skipEmptyLines: true,
             complete: function(results) {
-                if (!results.data || results.data.length < 2) {
-                    document.getElementById('header').innerText = "Error: Data format incorrect.";
-                    return;
-                }
+                // Feature 1: Display timestamp based on the last row's date or current time
+                const now = new Date();
+                document.getElementById('status-bar').innerText = `Glossary Sync: ${now.toLocaleDateString()} ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
 
                 allData = results.data.slice(1)
                     .filter(row => row[1] && row[2]) 
@@ -85,19 +96,16 @@
                 
                 const uniqueDates = [...new Set(allData.map(item => item.date))].sort((a, b) => b.localeCompare(a));
                 const selector = document.getElementById('date-selector');
-                
                 uniqueDates.forEach(date => {
                     let option = document.createElement('option');
                     option.value = date;
                     option.text = date;
                     selector.appendChild(option);
                 });
-
-                document.getElementById('header').innerText = "Select a session to begin";
+                document.getElementById('header').innerText = "Select a Note Day";
             },
-            error: function(err) {
-                document.getElementById('header').innerText = "Sync Error: Try refreshing the page.";
-                console.error("PapaParse Error:", err);
+            error: function() {
+                document.getElementById('status-bar').innerText = "Sync Error: glossary.csv not found.";
             }
         });
 
@@ -109,14 +117,13 @@
                 .sort(() => Math.random() - 0.5);
             currentIndex = 0;
             document.getElementById('selector-container').style.display = 'none';
+            document.getElementById('status-bar').style.display = 'none';
             document.getElementById('card-container').style.display = 'block';
-            document.getElementById('reminder').style.display = 'none';
             showCard();
         }
 
         function showCard() {
             const currentData = currentSessionCards[currentIndex];
-            document.getElementById('header').style.display = 'block';
             document.getElementById('header').innerText = `${currentData.date} (${currentIndex + 1}/${currentSessionCards.length})`;
             document.getElementById('front-text').innerText = currentData.chinese;
             document.getElementById('back-text').innerText = currentData.english;
@@ -146,7 +153,7 @@
             reminderDiv.style.display = 'block';
             reminderDiv.innerHTML = `
                 <strong>Session Complete!</strong><br><br>
-                Next review: <strong>2 days</strong>.<br><br>
+                Next review in <strong>2 days</strong>.<br><br>
                 <button onclick="location.reload()" style="background:#444; width:auto; padding:12px 24px;">New Session</button>
             `;
         }
