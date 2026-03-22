@@ -7,20 +7,21 @@
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
     <style>
         :root { --primary: #4CAF50; --secondary: #f44336; --bg: #f9f9f9; }
-        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
-        #header { margin-bottom: 10px; font-weight: bold; color: #555; text-align: center; }
-        #selector-container { margin-bottom: 20px; text-align: center; }
-        select { padding: 12px; border-radius: 8px; border: 1px solid #ddd; font-size: 16px; background: white; width: 220px; outline: none; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+        #header { margin-bottom: 15px; font-weight: bold; color: #555; text-align: center; min-height: 24px; }
+        #selector-container { margin-bottom: 20px; text-align: center; width: 100%; }
+        /* Improved select for iOS touch */
+        select { padding: 12px; border-radius: 8px; border: 1px solid #ddd; font-size: 16px; background: white; width: 80%; max-width: 300px; appearance: none; -webkit-appearance: none; }
         #card-container { width: 100%; max-width: 400px; height: 250px; perspective: 1000px; cursor: pointer; display: none; }
         .card { width: 100%; height: 100%; position: relative; transition: transform 0.6s; transform-style: preserve-3d; border: 1px solid #ddd; border-radius: 12px; background: white; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
         .card.flipped { transform: rotateY(180deg); }
         .card-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; align-items: center; justify-content: center; font-size: 24px; padding: 20px; box-sizing: border-box; text-align: center; }
         .card-back { transform: rotateY(180deg); background-color: #fffdf5; }
         #controls { margin-top: 30px; display: none; gap: 20px; width: 100%; max-width: 400px; }
-        button { flex: 1; padding: 15px; border: none; border-radius: 8px; color: white; font-size: 18px; font-weight: bold; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+        button { flex: 1; padding: 18px; border: none; border-radius: 12px; color: white; font-size: 18px; font-weight: bold; cursor: pointer; -webkit-tap-highlight-color: transparent; }
         .yes-btn { background-color: var(--primary); }
         .no-btn { background-color: var(--secondary); }
-        #reminder { display: none; text-align: center; font-size: 20px; margin-top: 50px; line-height: 1.5; color: #333; }
+        #reminder { display: none; text-align: center; font-size: 20px; margin-top: 50px; line-height: 1.5; color: #333; padding: 20px; }
     </style>
 </head>
 <body>
@@ -48,6 +49,7 @@
     <div id="reminder"></div>
 
     <script>
+        // Updated URL and improved fetching for Safari
         const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRlw2q97jLEUwmjCO_HsvPbDyeJIH4o7_qomsEz1GCLLVmZCm1sYP8XSGlDXjTHWCjXeU_2DaSXWAs/pub?gid=949570896&single=true&output=csv';
         let allData = [];
         let currentSessionCards = [];
@@ -62,11 +64,17 @@
             return `${y}-${m}-${d}`;
         }
 
+        // Use Papa.parse with explicit configuration for better iOS support
         Papa.parse(CSV_URL, {
             download: true,
             header: false,
             skipEmptyLines: true,
             complete: function(results) {
+                if (!results.data || results.data.length < 2) {
+                    document.getElementById('header').innerText = "Error: Data format incorrect.";
+                    return;
+                }
+
                 allData = results.data.slice(1)
                     .filter(row => row[1] && row[2]) 
                     .map(row => ({
@@ -77,13 +85,19 @@
                 
                 const uniqueDates = [...new Set(allData.map(item => item.date))].sort((a, b) => b.localeCompare(a));
                 const selector = document.getElementById('date-selector');
+                
                 uniqueDates.forEach(date => {
                     let option = document.createElement('option');
                     option.value = date;
                     option.text = date;
                     selector.appendChild(option);
                 });
+
                 document.getElementById('header').innerText = "Select a session to begin";
+            },
+            error: function(err) {
+                document.getElementById('header').innerText = "Sync Error: Try refreshing the page.";
+                console.error("PapaParse Error:", err);
             }
         });
 
@@ -103,7 +117,7 @@
         function showCard() {
             const currentData = currentSessionCards[currentIndex];
             document.getElementById('header').style.display = 'block';
-            document.getElementById('header').innerText = `${currentData.date} | Card ${currentIndex + 1}/${currentSessionCards.length}`;
+            document.getElementById('header').innerText = `${currentData.date} (${currentIndex + 1}/${currentSessionCards.length})`;
             document.getElementById('front-text').innerText = currentData.chinese;
             document.getElementById('back-text').innerText = currentData.english;
             document.getElementById('card').classList.remove('flipped');
@@ -132,9 +146,8 @@
             reminderDiv.style.display = 'block';
             reminderDiv.innerHTML = `
                 <strong>Session Complete!</strong><br><br>
-                Based on the Ebbinghaus curve,<br>
-                your next review for this set is in <strong>2 days</strong>.<br><br>
-                <button onclick="location.reload()" style="background:#444; width:auto; padding:10px 20px;">Review Another Day</button>
+                Next review: <strong>2 days</strong>.<br><br>
+                <button onclick="location.reload()" style="background:#444; width:auto; padding:12px 24px;">New Session</button>
             `;
         }
     </script>
