@@ -53,10 +53,9 @@
         let currentSessionCards = [];
         let currentIndex = 0;
 
-        // Function to clean and unify date formats
         function formatDate(dateStr) {
             const date = new Date(dateStr);
-            if (isNaN(date)) return dateStr.trim(); // Fallback to raw string if invalid
+            if (isNaN(date)) return dateStr.trim();
             const y = date.getFullYear();
             const m = String(date.getMonth() + 1).padStart(2, '0');
             const d = String(date.getDate()).padStart(2, '0');
@@ -68,18 +67,15 @@
             header: false,
             skipEmptyLines: true,
             complete: function(results) {
-                // Map and clean data with unified date formatting [cite: 8, 12]
                 allData = results.data.slice(1)
-                    .filter(row => row[1] && row[2]) // Ignore blank cells [cite: 18]
+                    .filter(row => row[1] && row[2]) 
                     .map(row => ({
                         date: formatDate(row[0]),
                         chinese: row[1].trim(),
                         english: row[2].trim()
                     }));
                 
-                // Extract unique formatted dates and sort them descending (newest first)
                 const uniqueDates = [...new Set(allData.map(item => item.date))].sort((a, b) => b.localeCompare(a));
-                
                 const selector = document.getElementById('date-selector');
                 uniqueDates.forEach(date => {
                     let option = document.createElement('option');
@@ -87,7 +83,6 @@
                     option.text = date;
                     selector.appendChild(option);
                 });
-
                 document.getElementById('header').innerText = "Select a session to begin";
             }
         });
@@ -95,12 +90,9 @@
         function startSession() {
             const selectedDate = document.getElementById('date-selector').value;
             if (!selectedDate) return;
-
-            // Filter by date and randomize order for testing [cite: 12, 19]
             currentSessionCards = allData
                 .filter(item => item.date === selectedDate)
                 .sort(() => Math.random() - 0.5);
-
             currentIndex = 0;
             document.getElementById('selector-container').style.display = 'none';
             document.getElementById('card-container').style.display = 'block';
@@ -112,21 +104,21 @@
             const currentData = currentSessionCards[currentIndex];
             document.getElementById('header').style.display = 'block';
             document.getElementById('header').innerText = `${currentData.date} | Card ${currentIndex + 1}/${currentSessionCards.length}`;
-            document.getElementById('front-text').innerText = currentData.chinese; // Default Chinese [cite: 13]
-            document.getElementById('back-text').innerText = currentData.english;  // English on back [cite: 14]
+            document.getElementById('front-text').innerText = currentData.chinese;
+            document.getElementById('back-text').innerText = currentData.english;
             document.getElementById('card').classList.remove('flipped');
             document.getElementById('controls').style.display = 'none';
         }
 
         function flipCard() {
-            document.getElementById('card').classList.add('flipped'); // Flip card on touch [cite: 14]
-            document.getElementById('controls').style.display = 'flex'; // Show Yes/No buttons [cite: 15]
+            document.getElementById('card').classList.add('flipped');
+            document.getElementById('controls').style.display = 'flex';
         }
 
         function nextCard() {
             currentIndex++;
             if (currentIndex < currentSessionCards.length) {
-                showCard(); // Move to next card [cite: 16]
+                showCard();
             } else {
                 showReminder();
             }
@@ -136,10 +128,8 @@
             document.getElementById('card-container').style.display = 'none';
             document.getElementById('controls').style.display = 'none';
             document.getElementById('header').style.display = 'none';
-            
             const reminderDiv = document.getElementById('reminder');
             reminderDiv.style.display = 'block';
-            // Ebbinghaus Forgetting Curve reminder [cite: 17]
             reminderDiv.innerHTML = `
                 <strong>Session Complete!</strong><br><br>
                 Based on the Ebbinghaus curve,<br>
