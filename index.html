@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LingoCurve_individual1</title>
+    <!-- 1. Load the library FIRST -->
     <script src="https://cdnjs.cloudflare.com"></script>
     <style>
         :root { --primary: #4CAF50; --secondary: #f44336; --bg: #f9f9f9; }
@@ -13,7 +14,7 @@
         .card { width: 100%; height: 100%; position: relative; transition: transform 0.6s; transform-style: preserve-3d; border: 1px solid #ddd; border-radius: 12px; background: white; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
         .card.flipped { transform: rotateY(180deg); }
         .card-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; align-items: center; justify-content: center; font-size: 24px; padding: 20px; box-sizing: border-box; text-align: center; }
-        .card-back { transform: rotateY(180deg); }
+        .card-back { transform: rotateY(180deg); background-color: #fffdf5; }
         #controls { margin-top: 30px; display: none; gap: 20px; width: 100%; max-width: 400px; }
         button { flex: 1; padding: 15px; border: none; border-radius: 8px; color: white; font-size: 18px; font-weight: bold; cursor: pointer; }
         .yes-btn { background-color: var(--primary); }
@@ -23,7 +24,7 @@
 </head>
 <body>
 
-    <div id="header">Loading...</div>
+    <div id="header">Syncing with CSV...</div>
 
     <div id="card-container" onclick="flipCard()">
         <div class="card" id="card">
@@ -39,77 +40,68 @@
 
     <div id="reminder"></div>
 
-	<script>
-		const CSV_URL = 'https://docs.google.com';
-		let cards = [];
-		let currentIndex = 0;
+    <script>
+        // 2. Wait for the browser to be fully ready
+        document.addEventListener('DOMContentLoaded', function() {
+            const CSV_URL = 'https://docs.google.com';
+            let cards = [];
+            let currentIndex = 0;
 
-		// 1. Fetch CSV using PapaParse with improved error handling
-		Papa.parse(CSV_URL, {
-			download: true,
-			header: false,
-			skipEmptyLines: true,
-			complete: function(results) {
-				const data = results.data.slice(1); // Skip header row
-				
-				// 2. Identify the target date (using the most recent date in the sheet)
-				// Adjust this if you want to hardcode a specific date like "2026/3/20"
-				const uniqueDates = [...new Set(data.map(row => row[0]))].filter(d => d);
-				const latestDate = uniqueDates[uniqueDates.length - 1];
+            Papa.parse(CSV_URL, {
+                download: true,
+                header: false,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    const rawData = results.data.slice(1); 
+                    // Use a fallback for target date if one isn't specified
+                    const uniqueDates = [...new Set(rawData.map(row => row[0]))].filter(d => d);
+                    const targetDate = uniqueDates[uniqueDates.length - 1];
 
-				// 3. Filter for valid rows on that date (ignore blanks in B or C)
-				cards = data.filter(row => row[0] === latestDate && row[1] && row[2])
-							.sort(() => Math.random() - 0.5); // Randomize order
+                    cards = rawData.filter(row => row[0] === targetDate && row[1] && row[2])
+                                   .sort(() => Math.random() - 0.5);
 
-				if (cards.length > 0) {
-					showCard();
-				} else {
-					document.getElementById('header').innerText = "No cards found for today.";
-				}
-			},
-			error: function(err) {
-				document.getElementById('header').innerText = "Error loading data. Check CSV link.";
-				console.error(err);
-			}
-		});
+                    if(cards.length > 0) {
+                        showCard();
+                    } else {
+                        document.getElementById('header').innerText = "No test data available.";
+                    }
+                },
+                error: function(err) {
+                    document.getElementById('header').innerText = "Sync failed. Check connection.";
+                }
+            });
 
-		function showCard() {
-			const cardData = cards[currentIndex];
-			document.getElementById('header').innerText = `${cardData[0]} round1`;
-			document.getElementById('front-text').innerText = cardData[1]; // Chinese (Col B)
-			document.getElementById('back-text').innerText = cardData[2];  // English (Col C)
-			document.getElementById('card').classList.remove('flipped');
-			document.getElementById('controls').style.display = 'none';
-		}
+            window.showCard = function() {
+                const data = cards[currentIndex];
+                document.getElementById('header').innerText = `${data[0]} Round 1`;
+                document.getElementById('front-text').innerText = data[1]; // Column B
+                document.getElementById('back-text').innerText = data[2];  // Column C
+                document.getElementById('card').classList.remove('flipped');
+                document.getElementById('controls').style.display = 'none';
+            };
 
-		// Keep the rest of your existing functions (flipCard, nextCard, showReminder) as is.
+            window.flipCard = function() {
+                document.getElementById('card').classList.add('flipped');
+                document.getElementById('controls').style.display = 'flex';
+            };
 
+            window.nextCard = function() {
+                currentIndex++;
+                if (currentIndex < cards.length) {
+                    showCard();
+                } else {
+                    showReminder();
+                }
+            };
 
-        function flipCard() {
-            document.getElementById('card').classList.add('flipped');
-            document.getElementById('controls').style.display = 'flex';
-        }
-
-        function nextCard() {
-            currentIndex++;
-            if (currentIndex < cards.length) {
-                showCard();
-            } else {
-                showReminder();
-            }
-        }
-
-        function showReminder() {
-            document.getElementById('card-container').style.display = 'none';
-            document.getElementById('controls').style.display = 'none';
-            document.getElementById('header').style.display = 'none';
-            
-            // Logic: Ebbinghaus typically suggests next review in 2 days for the first interval
-            const nextDate = "2026/3/22"; 
-            const reminderDiv = document.getElementById('reminder');
-            reminderDiv.style.display = 'block';
-            reminderDiv.innerHTML = `The next test day is ${nextDate}`;
-        }
+            window.showReminder = function() {
+                document.getElementById('card-container').style.display = 'none';
+                document.getElementById('controls').style.display = 'none';
+                document.getElementById('header').style.display = 'none';
+                document.getElementById('reminder').style.display = 'block';
+                document.getElementById('reminder').innerText = "Session Complete! Next review based on Ebbinghaus curve: March 24, 2026";
+            };
+        });
     </script>
 </body>
 </html>
