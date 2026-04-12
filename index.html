@@ -14,32 +14,56 @@
     <style>
         :root { --primary: #4CAF50; --secondary: #f44336; --bg: #f9f9f9; }
         body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        #status-bar { font-size: 11px; color: #999; margin-bottom: 10px; text-align: center; }
+        
+        /* Notification UI */
+        #notification-box { 
+            display: none; width: 90%; max-width: 400px; background: white; 
+            border-radius: 15px; padding: 20px; margin-bottom: 20px; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1); border-left: 5px solid var(--secondary);
+            animation: slideDown 0.5s ease;
+        }
+        @keyframes slideDown { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        
+        .badge { 
+            background: var(--secondary); color: white; border-radius: 50%; 
+            padding: 2px 8px; font-size: 12px; margin-left: 5px; vertical-align: middle; 
+        }
+
+        #status-bar { font-size: 11px; color: #999; margin-bottom: 10px; }
         #header { margin-bottom: 15px; font-weight: bold; color: #555; text-align: center; }
-        #selector-container { margin-bottom: 20px; text-align: center; width: 100%; }
+        #selector-container { text-align: center; width: 100%; }
         select { padding: 12px; border-radius: 8px; border: 1px solid #ddd; font-size: 16px; background: white; width: 85%; max-width: 300px; -webkit-appearance: none; }
+        
         #card-container { width: 100%; max-width: 400px; height: 250px; perspective: 1000px; display: none; }
         .card { width: 100%; height: 100%; position: relative; transition: transform 0.4s; transform-style: preserve-3d; border: 1px solid #ddd; border-radius: 12px; background: white; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
         .card.flipped { transform: rotateY(180deg); }
         .card-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; align-items: center; justify-content: center; font-size: 24px; padding: 20px; box-sizing: border-box; text-align: center; }
         .card-back { transform: rotateY(180deg); background-color: #fffdf5; }
+        
         #controls { margin-top: 30px; display: none; gap: 20px; width: 100%; max-width: 400px; }
         button { flex: 1; padding: 18px; border: none; border-radius: 12px; color: white; font-size: 18px; font-weight: bold; cursor: pointer; }
         .yes-btn { background-color: var(--primary); }
         .no-btn { background-color: var(--secondary); }
-        #reminder { display: none; text-align: center; font-size: 14px; margin-top: 20px; width: 100%; max-width: 500px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
-        th { background-color: #f2f2f2; font-size: 12px; }
-        .highlight-row { background-color: #e8f5e9; font-weight: bold; }
+        #reminder { display: none; text-align: center; font-size: 14px; margin-top: 20px; width: 100%; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; font-size: 11px; }
+        th, td { border: 1px solid #ddd; padding: 6px; text-align: center; }
+        .highlight-row { background-color: #fff4f4; font-weight: bold; color: var(--secondary); }
     </style>
 </head>
 <body>
 
-    <div id="status-bar">Looking for glossary.csv...</div>
+    <div id="notification-box">
+        <div style="font-weight: bold; color: var(--secondary); margin-bottom: 5px;">🔔 Action Required</div>
+        <div id="notification-msg"></div>
+    </div>
+
+    <div id="status-bar">Connecting...</div>
     <div id="header">LingoCurve</div>
 
     <div id="selector-container">
+        <div id="badge-count" style="margin-bottom: 10px; font-size: 14px; display: none;">
+            You have <span id="pending-num" class="badge">0</span> tasks for today
+        </div>
         <select id="date-selector" onchange="startSession()">
             <option value="">-- Choose a Note Day --</option>
         </select>
@@ -63,9 +87,7 @@
         const CSV_FILE = 'glossary.csv?v=' + new Date().getTime(); 
         let allData = [];
         let currentSessionCards = [];
-        let currentIndex = 0;
-        let activeNoteDay = null;
-        let yesCount = 0;
+        let currentIndex = 0, yesCount = 0, activeNoteDay = null;
         const intervals = [1, 2, 4, 7, 14, 28, 90];
 
         function formatDate(dateStr) {
@@ -79,62 +101,64 @@
             header: false,
             skipEmptyLines: true,
             complete: function(results) {
-                const now = new Date();
-                document.getElementById('status-bar').innerText = `Sync: ${now.toLocaleTimeString()}`;
-
+                document.getElementById('status-bar').innerText = `Sync: ${new Date().toLocaleTimeString()}`;
                 allData = results.data.slice(1)
                     .filter(row => row[0] && row[1] && row[2]) 
-                    .map(row => ({
-                        date: formatDate(row[0]),
-                        chinese: row[1].trim(),
-                        english: row[2].trim()
-                    }));
+                    .map(row => ({ date: formatDate(row[0]), chinese: row[1].trim(), english: row[2].trim() }));
                 
-                if (allData.length === 0) {
-                    document.getElementById('status-bar').innerText = "File found, but no data found inside.";
-                    return;
-                }
-
                 const uniqueDates = [...new Set(allData.map(item => item.date))].sort((a, b) => b.localeCompare(a));
                 const selector = document.getElementById('date-selector');
+                
+                let pendingDates = [];
+                const today = new Date();
+                today.setHours(0,0,0,0);
+
                 uniqueDates.forEach(date => {
+                    const start = new Date(date);
+                    const diff = Math.floor((today - start) / (1000 * 60 * 60 * 24));
+                    const isDue = intervals.includes(diff);
+                    
                     let option = document.createElement('option');
                     option.value = date;
-                    option.text = date;
+                    option.text = isDue ? `🔴 ${date} (DUE)` : date;
                     selector.appendChild(option);
+                    
+                    if (isDue) pendingDates.push(date);
                 });
-                document.getElementById('header').innerText = "Select a Session";
-            },
-            error: function() {
-                document.getElementById('status-bar').innerText = "ERROR: Cannot find 'glossary.csv'. Check your GitHub files.";
-                document.getElementById('header').innerText = "Connection Failed";
+
+                // Show Notification Message
+                if (pendingDates.length > 0) {
+                    document.getElementById('notification-box').style.display = 'block';
+                    document.getElementById('notification-msg').innerHTML = 
+                        `As scheduled, please take a test on note day of:<br><strong>${pendingDates.join(', ')}</strong>`;
+                    document.getElementById('badge-count').style.display = 'block';
+                    document.getElementById('pending-num').innerText = pendingDates.length;
+                }
             }
         });
 
         function startSession() {
             activeNoteDay = document.getElementById('date-selector').value;
             if (!activeNoteDay) return;
+            document.getElementById('notification-box').style.display = 'none';
+            document.getElementById('badge-count').style.display = 'none';
+            document.getElementById('selector-container').style.display = 'none';
+            document.getElementById('card-container').style.display = 'block';
             currentSessionCards = allData.filter(item => item.date === activeNoteDay).sort(() => Math.random() - 0.5);
             currentIndex = 0; yesCount = 0;
-            document.getElementById('selector-container').style.display = 'none';
-            document.getElementById('status-bar').style.display = 'none';
-            document.getElementById('card-container').style.display = 'block';
             showCard();
         }
 
         function showCard() {
-            const currentData = currentSessionCards[currentIndex];
+            const data = currentSessionCards[currentIndex];
             document.getElementById('header').innerText = `Card ${currentIndex + 1}/${currentSessionCards.length}`;
-            document.getElementById('front-text').innerText = currentData.chinese;
-            document.getElementById('back-text').innerText = currentData.english;
+            document.getElementById('front-text').innerText = data.chinese;
+            document.getElementById('back-text').innerText = data.english;
             document.getElementById('card').classList.remove('flipped');
             document.getElementById('controls').style.display = 'none';
         }
 
-        function flipCard() {
-            document.getElementById('card').classList.add('flipped');
-            document.getElementById('controls').style.display = 'flex';
-        }
+        function flipCard() { document.getElementById('card').classList.add('flipped'); document.getElementById('controls').style.display = 'flex'; }
 
         function recordAnswer(isYes) {
             if (isYes) yesCount++;
@@ -145,28 +169,22 @@
         function showReminder() {
             document.getElementById('card-container').style.display = 'none';
             document.getElementById('controls').style.display = 'none';
-            document.getElementById('header').style.display = 'none';
-            
             const start = new Date(activeNoteDay);
-            const today = new Date();
-            const diffDays = Math.floor((today - start) / (1000 * 60 * 60 * 24));
+            const today = new Date(); today.setHours(0,0,0,0);
+            const diff = Math.floor((today - start) / (1000 * 60 * 60 * 24));
             const accuracy = ((yesCount / currentSessionCards.length) * 100).toFixed(0);
 
-            let tableHTML = `<table><tr><th>#</th><th>Lag</th><th>Date</th><th>Done?</th><th>Acc.</th></tr>`;
-            intervals.forEach((days, index) => {
-                let testDate = new Date(start);
-                testDate.setDate(start.getDate() + days);
-                const isCurrent = (diffDays >= days && (index === intervals.length - 1 || diffDays < intervals[index+1]));
+            let tableHTML = `<table><tr><th>Test</th><th>Lag</th><th>Acc.</th></tr>`;
+            intervals.forEach((days, i) => {
+                const isCurrent = (diff === days);
                 tableHTML += `<tr ${isCurrent ? 'class="highlight-row"' : ''}>
-                    <td>${index + 1}</td><td>${days}d</td><td>${testDate.toLocaleDateString()}</td>
-                    <td>${isCurrent ? "Yes" : (diffDays > days ? "✓" : "")}</td>
-                    <td>${isCurrent ? accuracy + "%" : ""}</td></tr>`;
+                    <td>#${i+1}</td><td>${days}d</td><td>${isCurrent ? accuracy + "%" : (diff > days ? "✓" : "")}</td></tr>`;
             });
             tableHTML += `</table>`;
 
             const reminderDiv = document.getElementById('reminder');
             reminderDiv.style.display = 'block';
-            reminderDiv.innerHTML = `<strong>Summary</strong><br>${tableHTML}<br><button onclick="location.reload()" style="background:#444; color:white; padding:10px; border-radius:8px; border:none; margin-top:10px;">Menu</button>`;
+            reminderDiv.innerHTML = `<strong>Summary</strong>${tableHTML}<br><button onclick="location.reload()" style="background:#444; color:white; padding:10px; border-radius:8px; border:none; width:100%;">Menu</button>`;
         }
     </script>
 </body>
