@@ -1,219 +1,118 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>LingoCurve_individual1</title>
-    
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="LingoCurve">
+<script>
+    // Force cache-busting for the CSV
+    const CSV_FILE = 'glossary.csv?v=' + new Date().getTime(); 
+    let allData = [];
+    let currentSessionCards = [];
+    let currentIndex = 0;
+    let yesCount = 0; 
+    let activeNoteDay = null;
+    const intervals = [1, 2, 4, 7, 14, 28, 90];
 
-    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
-    
-    <style>
-        :root { --primary: #4CAF50; --secondary: #f44336; --bg: #f9f9f9; }
-        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        
-        #notification-box { display: none; width: 95%; max-width: 400px; background: white; border-radius: 12px; padding: 15px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border-left: 5px solid var(--secondary); }
-        #header { margin-bottom: 15px; font-weight: bold; color: #333; text-align: center; font-size: 20px; }
-        #selector-container { text-align: center; width: 100%; }
-        select { padding: 14px; border-radius: 10px; border: 1px solid #ccc; font-size: 16px; background: white; width: 90%; max-width: 320px; -webkit-appearance: none; }
-        
-        #card-container { width: 100%; max-width: 400px; height: 260px; perspective: 1000px; display: none; }
-        .card { width: 100%; height: 100%; position: relative; transition: transform 0.4s; transform-style: preserve-3d; border-radius: 15px; background: white; box-shadow: 0 8px 16px rgba(0,0,0,0.1); }
-        .card.flipped { transform: rotateY(180deg); }
-        .card-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; align-items: center; justify-content: center; font-size: 26px; padding: 25px; box-sizing: border-box; text-align: center; }
-        .card-back { transform: rotateY(180deg); background-color: #fffef0; }
-        
-        #controls { margin-top: 30px; display: none; gap: 20px; width: 100%; max-width: 400px; }
-        button { flex: 1; padding: 20px; border: none; border-radius: 12px; color: white; font-size: 18px; font-weight: bold; cursor: pointer; }
-        .yes-btn { background-color: var(--primary); }
-        .no-btn { background-color: var(--secondary); }
+    // NEW: Function to get "Today" specifically in Singapore Time
+    function getSingaporeToday() {
+        const now = new Date();
+        // Convert current time to a string in Singapore time, then parse it back
+        const sgString = now.toLocaleString("en-US", {timeZone: "Asia/Singapore"});
+        const today = new Date(sgString);
+        today.setHours(0, 0, 0, 0); // Reset to midnight
+        return today;
+    }
 
-        #reminder { display: none; width: 100%; max-width: 450px; background: white; padding: 15px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
-        th { background-color: #f8f9fa; color: #666; font-weight: 600; border-bottom: 2px solid #eee; padding: 10px 5px; }
-        td { border-bottom: 1px solid #eee; padding: 12px 5px; text-align: center; color: #444; }
-        .highlight-row { background-color: #fff5f5; color: var(--secondary) !important; font-weight: bold; }
-    </style>
-</head>
-<body>
+    // NEW: Robust Date Parser that ignores UTC shifts
+    function parseToLocalMidnight(dateStr) {
+        if (!dateStr) return null;
+        // Split YYYY-MM-DD to avoid the browser assuming UTC
+        const parts = dateStr.split('-');
+        if (parts.length !== 3) return new Date(dateStr); 
+        // Create date using local year, month (0-indexed), and day
+        return new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0);
+    }
 
-    <div id="notification-box">
-        <div style="font-weight: bold; color: var(--secondary); margin-bottom: 4px;">🔔 Scheduled Test</div>
-        <div id="notification-msg" style="font-size: 14px; line-height: 1.4;"></div>
-    </div>
+    function formatDate(dateStr) {
+        const d = parseToLocalMidnight(dateStr);
+        if (!d || isNaN(d)) return dateStr;
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
 
-    <div id="header">LingoCurve</div>
+    Papa.parse(CSV_FILE, {
+        download: true,
+        header: false,
+        skipEmptyLines: true,
+        complete: function(results) {
+            allData = results.data.slice(1)
+                .filter(row => row[0] && row[1] && row[2]) 
+                .map(row => ({ 
+                    date: formatDate(row[0]), 
+                    chinese: row[1].trim(), 
+                    english: row[2].trim() 
+                }));
+            
+            const uniqueDates = [...new Set(allData.map(item => item.date))].sort((a, b) => b.localeCompare(a));
+            const selector = document.getElementById('date-selector');
+            
+            let dueDates = [];
+            const today = getSingaporeToday(); // SGT Midnight
 
-    <div id="selector-container">
-        <select id="date-selector" onchange="startSession()">
-            <option value="">-- Select Note Date --</option>
-        </select>
-    </div>
-
-    <div id="card-container" onclick="flipCard()">
-        <div class="card" id="card">
-            <div class="card-face card-front" id="front-text"></div>
-            <div class="card-face card-back" id="back-text"></div>
-        </div>
-    </div>
-
-    <div id="controls">
-        <button class="yes-btn" onclick="recordAnswer(true)">Yes</button>
-        <button class="no-btn" onclick="recordAnswer(false)">No</button>
-    </div>
-
-    <div id="reminder"></div>
-
-    <script>
-        const CSV_FILE = 'glossary.csv?v=' + new Date().getTime(); 
-        let allData = [];
-        let currentSessionCards = [];
-        let currentIndex = 0;
-        let yesCount = 0; // Tracking Yes responses
-        let activeNoteDay = null;
-        const intervals = [1, 2, 4, 7, 14, 28, 90];
-
-        function formatDate(dateStr) {
-            if (!dateStr) return null;
-            const date = new Date(dateStr.trim());
-            return isNaN(date) ? dateStr.trim() : `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-        }
-
-        Papa.parse(CSV_FILE, {
-            download: true,
-            header: false,
-            skipEmptyLines: true,
-            complete: function(results) {
-                allData = results.data.slice(1)
-                    .filter(row => row[0] && row[1] && row[2]) 
-                    .map(row => ({ date: formatDate(row[0]), chinese: row[1].trim(), english: row[2].trim() }));
+            uniqueDates.forEach(date => {
+                const start = parseToLocalMidnight(date); // Note day Midnight
+                const diff = Math.round((today - start) / (1000 * 60 * 60 * 24));
                 
-                const uniqueDates = [...new Set(allData.map(item => item.date))].sort((a, b) => b.localeCompare(a));
-                const selector = document.getElementById('date-selector');
+                const isDue = intervals.includes(diff);
                 
-                let dueDates = [];
-                const today = new Date(); today.setHours(0,0,0,0);
-
-                uniqueDates.forEach(date => {
-                    const start = new Date(date);
-                    const diff = Math.floor((today - start) / (1000 * 60 * 60 * 24));
-                    const isDue = intervals.includes(diff);
-                    
-                    let option = document.createElement('option');
-                    option.value = date;
-                    option.text = isDue ? `📍 ${date} (Due Today)` : date;
-                    selector.appendChild(option);
-                    if (isDue) dueDates.push(date);
-                });
-
-                if (dueDates.length > 0) {
-                    document.getElementById('notification-box').style.display = 'block';
-                    document.getElementById('notification-msg').innerHTML = 
-                        `As scheduled, please take a test on note day of:<br><strong>${dueDates.join(', ')}</strong>`;
-                }
-            }
-        });
-
-        function startSession() {
-            activeNoteDay = document.getElementById('date-selector').value;
-            if (!activeNoteDay) return;
-            
-            // RESET Session State
-            yesCount = 0;
-            currentIndex = 0;
-            
-            document.getElementById('notification-box').style.display = 'none';
-            document.getElementById('selector-container').style.display = 'none';
-            document.getElementById('card-container').style.display = 'block';
-            
-            currentSessionCards = allData.filter(item => item.date === activeNoteDay).sort(() => Math.random() - 0.5);
-            showCard();
-        }
-
-        function showCard() {
-            const data = currentSessionCards[currentIndex];
-            document.getElementById('header').innerText = `Testing: ${currentIndex + 1}/${currentSessionCards.length}`;
-            document.getElementById('front-text').innerText = data.chinese;
-            document.getElementById('back-text').innerText = data.english;
-            document.getElementById('card').classList.remove('flipped');
-            document.getElementById('controls').style.display = 'none';
-        }
-
-        function flipCard() { 
-            document.getElementById('card').classList.add('flipped'); 
-            document.getElementById('controls').style.display = 'flex'; 
-        }
-
-        function recordAnswer(isYes) {
-            if (isYes === true) {
-                yesCount++;
-            }
-            currentIndex++;
-            if (currentIndex < currentSessionCards.length) {
-                showCard();
-            } else {
-                showReminder();
-            }
-        }
-
-        function showReminder() {
-            document.getElementById('card-container').style.display = 'none';
-            document.getElementById('controls').style.display = 'none';
-            document.getElementById('header').innerText = "Test Results";
-            
-            const start = new Date(activeNoteDay);
-            const today = new Date(); 
-            today.setHours(0,0,0,0);
-            
-            const diff = Math.floor((today - start) / (1000 * 60 * 60 * 24));
-            
-            // Ensure accuracy is calculated correctly [Yes / Total * 100]
-            const calcAccuracy = Math.round((yesCount / currentSessionCards.length) * 100);
-
-            let tableHTML = `<table>
-                <tr>
-                    <th># test</th>
-                    <th>days lag</th>
-                    <th>test day</th>
-                    <th>if tested</th>
-                    <th>accuracy</th>
-                </tr>`;
-
-            intervals.forEach((days, i) => {
-                const testDate = new Date(start);
-                testDate.setDate(start.getDate() + days);
+                let option = document.createElement('option');
+                option.value = date;
+                option.text = isDue ? `📍 ${date} (Due Today)` : date;
+                selector.appendChild(option);
                 
-                // Check if this row is the "current" test based on day lag
-                const isCurrent = (diff >= days && (i === intervals.length - 1 || diff < intervals[i+1]));
-                const isPast = (diff > days && !isCurrent);
-                
-                let rowClass = isCurrent ? 'class="highlight-row"' : '';
-                let status = isCurrent ? "Tested" : (isPast ? "Complete" : "Pending");
-                
-                // Show percentage ONLY on the "Tested" (active) row
-                let accDisplay = isCurrent ? `<strong>${calcAccuracy}%</strong>` : "";
-
-                tableHTML += `<tr ${rowClass}>
-                    <td>${i + 1}</td>
-                    <td>${days} days</td>
-                    <td>${testDate.getMonth()+1}/${testDate.getDate()}/${testDate.getFullYear()}</td>
-                    <td>${status}</td>
-                    <td>${accDisplay}</td>
-                </tr>`;
+                if (isDue) dueDates.push(date);
             });
-            tableHTML += `</table>`;
 
-            const reminderDiv = document.getElementById('reminder');
-            reminderDiv.style.display = 'block';
-            reminderDiv.innerHTML = `
-                <div style="text-align:center; font-weight:bold; margin-bottom:10px;">Ebbinghaus Tracker</div>
-                ${tableHTML}
-                <button onclick="location.reload()" style="background:#444; color:white; padding:15px; border-radius:10px; border:none; width:100%; margin-top:20px; font-size:16px;">Return to Menu</button>
-            `;
+            if (dueDates.length > 0) {
+                document.getElementById('notification-box').style.display = 'block';
+                document.getElementById('notification-msg').innerHTML = 
+                    `As scheduled, please take a test on note day of:<br><strong>${dueDates.join(', ')}</strong>`;
+            }
         }
-    </script>
-</body>
-</html>
+    });
+
+    // ... recordAnswer and showCard remain the same ...
+
+    function showReminder() {
+        document.getElementById('card-container').style.display = 'none';
+        document.getElementById('controls').style.display = 'none';
+        document.getElementById('header').innerText = "Test Results";
+        
+        const start = parseToLocalMidnight(activeNoteDay);
+        const today = getSingaporeToday();
+        const diff = Math.round((today - start) / (1000 * 60 * 60 * 24));
+        const calcAccuracy = Math.round((yesCount / currentSessionCards.length) * 100);
+
+        let tableHTML = `<table>
+            <tr><th># test</th><th>days lag</th><th>test day</th><th>if tested</th><th>accuracy</th></tr>`;
+
+        intervals.forEach((days, i) => {
+            const testDate = new Date(start);
+            testDate.setDate(start.getDate() + days);
+            
+            const isCurrent = (diff === days); // Exact match for the interval
+            const isPast = (diff > days);
+            
+            let rowClass = isCurrent ? 'class="highlight-row"' : '';
+            let status = isCurrent ? "Tested" : (isPast ? "Complete" : "Pending");
+            let accDisplay = isCurrent ? `<strong>${calcAccuracy}%</strong>` : "";
+
+            tableHTML += `<tr ${rowClass}>
+                <td>${i + 1}</td>
+                <td>${days} days</td>
+                <td>${testDate.getMonth()+1}/${testDate.getDate()}/${testDate.getFullYear()}</td>
+                <td>${status}</td>
+                <td>${accDisplay}</td>
+            </tr>`;
+        });
+        tableHTML += `</table>`;
+
+        const reminderDiv = document.getElementById('reminder');
+        reminderDiv.style.display = 'block';
+        reminderDiv.innerHTML = `<div style="text-align:center; font-weight:bold; margin-bottom:10px;">Ebbinghaus Tracker</div>${tableHTML}<button onclick="location.reload()" style="background:#444; color:white; padding:15px; border-radius:10px; border:none; width:100%; margin-top:20px; font-size:16px;">Return to Menu</button>`;
+    }
+</script>
