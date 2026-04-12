@@ -10,34 +10,38 @@
     <meta name="apple-mobile-web-app-title" content="LingoCurve">
 
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
+    
     <style>
         :root { --primary: #4CAF50; --secondary: #f44336; --bg: #f9f9f9; }
         body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
         #status-bar { font-size: 11px; color: #999; margin-bottom: 10px; text-align: center; font-family: monospace; }
         #header { margin-bottom: 15px; font-weight: bold; color: #555; text-align: center; }
+        
         #selector-container { margin-bottom: 20px; text-align: center; width: 100%; }
         select { padding: 12px; border-radius: 8px; border: 1px solid #ddd; font-size: 16px; background: white; width: 85%; max-width: 300px; -webkit-appearance: none; }
+        
         #card-container { width: 100%; max-width: 400px; height: 250px; perspective: 1000px; display: none; }
         .card { width: 100%; height: 100%; position: relative; transition: transform 0.4s; transform-style: preserve-3d; border: 1px solid #ddd; border-radius: 12px; background: white; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
         .card.flipped { transform: rotateY(180deg); }
         .card-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; align-items: center; justify-content: center; font-size: 24px; padding: 20px; box-sizing: border-box; text-align: center; }
         .card-back { transform: rotateY(180deg); background-color: #fffdf5; }
+        
         #controls { margin-top: 30px; display: none; gap: 20px; width: 100%; max-width: 400px; }
         button { flex: 1; padding: 18px; border: none; border-radius: 12px; color: white; font-size: 18px; font-weight: bold; cursor: pointer; }
         .yes-btn { background-color: var(--primary); }
         .no-btn { background-color: var(--secondary); }
-        
-        /* Tracker Table Style */
-        #reminder { display: none; text-align: center; font-size: 16px; margin-top: 20px; width: 100%; max-width: 500px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; font-size: 12px; }
+
+        #reminder { display: none; text-align: center; font-size: 14px; margin-top: 20px; width: 100%; max-width: 500px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
-        th { background-color: #f2f2f2; }
+        th { background-color: #f2f2f2; font-size: 12px; }
         .highlight-row { background-color: #e8f5e9; font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <div id="status-bar">Syncing...</div>
+    <div id="status-bar">Connecting to glossary.csv...</div>
     <div id="header">Loading Vocabulary...</div>
 
     <div id="selector-container">
@@ -61,60 +65,74 @@
     <div id="reminder"></div>
 
     <script>
-        const CSV_FILE = 'glossary.csv';
+        // Points to local file to ensure Mainland China accessibility
+        const CSV_FILE = 'glossary.csv'; 
         let allData = [];
         let currentSessionCards = [];
         let currentIndex = 0;
         let activeNoteDay = null;
-        let yesCount = 0; // NEW: Tracker variable
+        let yesCount = 0;
 
-        const intervals = [1, 2, 4, 7, 14, 28, 90]; [cite: 120]
+        const intervals = [1, 2, 4, 7, 14, 28, 90];
 
+        // Robust date formatting to handle various CSV inputs
         function formatDate(dateStr) {
-            const date = new Date(dateStr);
-            if (isNaN(date)) return dateStr.trim(); [cite: 122]
-            const y = date.getFullYear();
-            const m = String(date.getMonth() + 1).padStart(2, '0');
-            const d = String(date.getDate()).padStart(2, '0');
-            return `${y}-${m}-${d}`; [cite: 123]
+            if (!dateStr) return null;
+            const date = new Date(dateStr.trim());
+            if (isNaN(date)) return dateStr.trim();
+            return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
         }
 
+        // Initialize App by fetching local CSV [cite: 123]
         Papa.parse(CSV_FILE, {
             download: true,
             header: false,
             skipEmptyLines: true,
             complete: function(results) {
-                const now = new Date(); [cite: 124]
-                document.getElementById('status-bar').innerText = `UPDATED: ${now.toLocaleDateString()} ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+                const now = new Date();
+                document.getElementById('status-bar').innerText = `UPDATED: ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`;
 
+                // Parse and filter data based on Column A, B, and C [cite: 82, 84]
                 allData = results.data.slice(1)
-                    .filter(row => row[1] && row[2]) 
+                    .filter(row => row[0] && row[1] && row[2]) 
                     .map(row => ({
-                        date: formatDate(row[0]), [cite: 125]
+                        date: formatDate(row[0]),
                         chinese: row[1].trim(),
                         english: row[2].trim()
                     }));
                 
-                const uniqueDates = [...new Set(allData.map(item => item.date))].sort((a, b) => b.localeCompare(a)); [cite: 126]
+                if (allData.length === 0) {
+                    document.getElementById('header').innerText = "Error: glossary.csv is empty or unreadable.";
+                    return;
+                }
+
+                const uniqueDates = [...new Set(allData.map(item => item.date))].sort((a, b) => b.localeCompare(a));
                 const selector = document.getElementById('date-selector');
                 uniqueDates.forEach(date => {
                     let option = document.createElement('option');
-                    option.value = date; [cite: 127]
+                    option.value = date;
                     option.text = date;
                     selector.appendChild(option);
                 });
                 document.getElementById('header').innerText = "Select a Note Day";
+            },
+            error: function(err) {
+                document.getElementById('status-bar').innerText = "Sync Error: Ensure glossary.csv is in the same folder.";
+                console.error(err);
             }
         });
 
         function startSession() {
-            activeNoteDay = document.getElementById('date-selector').value; [cite: 129]
+            activeNoteDay = document.getElementById('date-selector').value;
             if (!activeNoteDay) return;
+            
+            // Randomize card order for each session [cite: 93, 130]
             currentSessionCards = allData
                 .filter(item => item.date === activeNoteDay)
-                .sort(() => Math.random() - 0.5); [cite: 130]
+                .sort(() => Math.random() - 0.5);
+            
             currentIndex = 0;
-            yesCount = 0; // Reset tracker
+            yesCount = 0;
             document.getElementById('selector-container').style.display = 'none';
             document.getElementById('status-bar').style.display = 'none';
             document.getElementById('card-container').style.display = 'block';
@@ -123,20 +141,20 @@
 
         function showCard() {
             const currentData = currentSessionCards[currentIndex];
-            document.getElementById('header').innerText = `${currentData.date} (${currentIndex + 1}/${currentSessionCards.length})`; [cite: 133]
-            document.getElementById('front-text').innerText = currentData.chinese; [cite: 133]
-            document.getElementById('back-text').innerText = currentData.english; [cite: 133]
+            document.getElementById('header').innerText = `${currentData.date} (${currentIndex + 1}/${currentSessionCards.length})`;
+            document.getElementById('front-text').innerText = currentData.chinese; // Show Chinese [cite: 87]
+            document.getElementById('back-text').innerText = currentData.english;  // Flip for English [cite: 88]
             document.getElementById('card').classList.remove('flipped');
             document.getElementById('controls').style.display = 'none';
         }
 
         function flipCard() {
             document.getElementById('card').classList.add('flipped');
-            document.getElementById('controls').style.display = 'flex'; [cite: 136]
+            document.getElementById('controls').style.display = 'flex'; // Show Yes/No [cite: 136]
         }
 
         function recordAnswer(isYes) {
-            if (isYes) yesCount++; // NEW: Increment tracker
+            if (isYes) yesCount++; // Track accuracy
             currentIndex++;
             if (currentIndex < currentSessionCards.length) {
                 showCard();
@@ -146,18 +164,16 @@
         }
 
         function showReminder() {
-            document.getElementById('card-container').style.display = 'none'; [cite: 140]
-            document.getElementById('controls').style.display = 'none'; [cite: 140]
+            document.getElementById('card-container').style.display = 'none';
+            document.getElementById('controls').style.display = 'none';
             document.getElementById('header').style.display = 'none';
             
             const start = new Date(activeNoteDay);
             const today = new Date();
-            const diffDays = Math.floor((today - start) / (1000 * 60 * 60 * 24)); [cite: 141]
-            
-            // Calculate accuracy rate
+            const diffDays = Math.floor((today - start) / (1000 * 60 * 60 * 24));
             const accuracy = ((yesCount / currentSessionCards.length) * 100).toFixed(0);
 
-            // Generate the Tracker Table
+            // Generate Tracker Table
             let tableHTML = `<table>
                 <tr>
                     <th># test</th>
@@ -171,7 +187,6 @@
                 let testDate = new Date(start);
                 testDate.setDate(start.getDate() + days);
                 
-                // Determine if this is the test we just completed
                 const isCurrentTest = (diffDays >= days && (index === intervals.length - 1 || diffDays < intervals[index+1]));
                 const rowClass = isCurrentTest ? 'class="highlight-row"' : '';
                 const ifTested = isCurrentTest ? "Yes" : (diffDays > days ? "Completed" : "");
@@ -192,7 +207,7 @@
             reminderDiv.innerHTML = `
                 <strong>Session Summary</strong><br>
                 ${tableHTML}<br>
-                <button onclick="location.reload()" style="background:#444; width:auto; padding:12px 24px; color:white; border-radius:8px; border:none;">Back to Menu</button>
+                <button onclick="location.reload()" style="background:#444; width:auto; padding:12px 24px; color:white; border-radius:8px; border:none; cursor:pointer;">Back to Menu</button>
             `;
         }
     </script>
