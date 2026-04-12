@@ -16,56 +16,45 @@
         body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         
         /* Notification UI */
-        #notification-box { 
-            display: none; width: 90%; max-width: 400px; background: white; 
-            border-radius: 15px; padding: 20px; margin-bottom: 20px; 
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1); border-left: 5px solid var(--secondary);
-            animation: slideDown 0.5s ease;
-        }
-        @keyframes slideDown { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        #notification-box { display: none; width: 95%; max-width: 400px; background: white; border-radius: 12px; padding: 15px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border-left: 5px solid var(--secondary); }
         
-        .badge { 
-            background: var(--secondary); color: white; border-radius: 50%; 
-            padding: 2px 8px; font-size: 12px; margin-left: 5px; vertical-align: middle; 
-        }
-
-        #status-bar { font-size: 11px; color: #999; margin-bottom: 10px; }
-        #header { margin-bottom: 15px; font-weight: bold; color: #555; text-align: center; }
+        #header { margin-bottom: 15px; font-weight: bold; color: #333; text-align: center; font-size: 20px; }
         #selector-container { text-align: center; width: 100%; }
-        select { padding: 12px; border-radius: 8px; border: 1px solid #ddd; font-size: 16px; background: white; width: 85%; max-width: 300px; -webkit-appearance: none; }
+        select { padding: 14px; border-radius: 10px; border: 1px solid #ccc; font-size: 16px; background: white; width: 90%; max-width: 320px; -webkit-appearance: none; }
         
-        #card-container { width: 100%; max-width: 400px; height: 250px; perspective: 1000px; display: none; }
-        .card { width: 100%; height: 100%; position: relative; transition: transform 0.4s; transform-style: preserve-3d; border: 1px solid #ddd; border-radius: 12px; background: white; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        #card-container { width: 100%; max-width: 400px; height: 260px; perspective: 1000px; display: none; }
+        .card { width: 100%; height: 100%; position: relative; transition: transform 0.4s; transform-style: preserve-3d; border-radius: 15px; background: white; box-shadow: 0 8px 16px rgba(0,0,0,0.1); }
         .card.flipped { transform: rotateY(180deg); }
-        .card-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; align-items: center; justify-content: center; font-size: 24px; padding: 20px; box-sizing: border-box; text-align: center; }
-        .card-back { transform: rotateY(180deg); background-color: #fffdf5; }
+        .card-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; align-items: center; justify-content: center; font-size: 26px; padding: 25px; box-sizing: border-box; text-align: center; }
+        .card-back { transform: rotateY(180deg); background-color: #fffef0; }
         
         #controls { margin-top: 30px; display: none; gap: 20px; width: 100%; max-width: 400px; }
-        button { flex: 1; padding: 18px; border: none; border-radius: 12px; color: white; font-size: 18px; font-weight: bold; cursor: pointer; }
+        button { flex: 1; padding: 20px; border: none; border-radius: 12px; color: white; font-size: 18px; font-weight: bold; cursor: pointer; }
         .yes-btn { background-color: var(--primary); }
         .no-btn { background-color: var(--secondary); }
-        #reminder { display: none; text-align: center; font-size: 14px; margin-top: 20px; width: 100%; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; font-size: 11px; }
-        th, td { border: 1px solid #ddd; padding: 6px; text-align: center; }
-        .highlight-row { background-color: #fff4f4; font-weight: bold; color: var(--secondary); }
+
+        /* Tracker Table Styling - Matched to tracker_demo.png */
+        #reminder { display: none; width: 100%; max-width: 450px; background: white; padding: 15px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+        th { background-color: #f8f9fa; color: #666; font-weight: 600; border-bottom: 2px solid #eee; padding: 10px 5px; }
+        td { border-bottom: 1px solid #eee; padding: 12px 5px; text-align: center; color: #444; }
+        .highlight-row { background-color: #fff5f5; color: var(--secondary) !important; font-weight: bold; }
+        .status-done { color: #888; }
+        .status-now { color: var(--secondary); font-weight: bold; }
     </style>
 </head>
 <body>
 
     <div id="notification-box">
-        <div style="font-weight: bold; color: var(--secondary); margin-bottom: 5px;">🔔 Action Required</div>
-        <div id="notification-msg"></div>
+        <div style="font-weight: bold; color: var(--secondary); margin-bottom: 4px;">🔔 Scheduled Test</div>
+        <div id="notification-msg" style="font-size: 14px; line-height: 1.4;"></div>
     </div>
 
-    <div id="status-bar">Connecting...</div>
     <div id="header">LingoCurve</div>
 
     <div id="selector-container">
-        <div id="badge-count" style="margin-bottom: 10px; font-size: 14px; display: none;">
-            You have <span id="pending-num" class="badge">0</span> tasks for today
-        </div>
         <select id="date-selector" onchange="startSession()">
-            <option value="">-- Choose a Note Day --</option>
+            <option value="">-- Select Note Date --</option>
         </select>
     </div>
 
@@ -101,7 +90,6 @@
             header: false,
             skipEmptyLines: true,
             complete: function(results) {
-                document.getElementById('status-bar').innerText = `Sync: ${new Date().toLocaleTimeString()}`;
                 allData = results.data.slice(1)
                     .filter(row => row[0] && row[1] && row[2]) 
                     .map(row => ({ date: formatDate(row[0]), chinese: row[1].trim(), english: row[2].trim() }));
@@ -109,9 +97,8 @@
                 const uniqueDates = [...new Set(allData.map(item => item.date))].sort((a, b) => b.localeCompare(a));
                 const selector = document.getElementById('date-selector');
                 
-                let pendingDates = [];
-                const today = new Date();
-                today.setHours(0,0,0,0);
+                let dueDates = [];
+                const today = new Date(); today.setHours(0,0,0,0);
 
                 uniqueDates.forEach(date => {
                     const start = new Date(date);
@@ -120,19 +107,15 @@
                     
                     let option = document.createElement('option');
                     option.value = date;
-                    option.text = isDue ? `🔴 ${date} (DUE)` : date;
+                    option.text = isDue ? `📍 ${date} (Due Today)` : date;
                     selector.appendChild(option);
-                    
-                    if (isDue) pendingDates.push(date);
+                    if (isDue) dueDates.push(date);
                 });
 
-                // Show Notification Message
-                if (pendingDates.length > 0) {
+                if (dueDates.length > 0) {
                     document.getElementById('notification-box').style.display = 'block';
                     document.getElementById('notification-msg').innerHTML = 
-                        `As scheduled, please take a test on note day of:<br><strong>${pendingDates.join(', ')}</strong>`;
-                    document.getElementById('badge-count').style.display = 'block';
-                    document.getElementById('pending-num').innerText = pendingDates.length;
+                        `As scheduled, please take a test on note day of:<br><strong>${dueDates.join(', ')}</strong>`;
                 }
             }
         });
@@ -141,7 +124,6 @@
             activeNoteDay = document.getElementById('date-selector').value;
             if (!activeNoteDay) return;
             document.getElementById('notification-box').style.display = 'none';
-            document.getElementById('badge-count').style.display = 'none';
             document.getElementById('selector-container').style.display = 'none';
             document.getElementById('card-container').style.display = 'block';
             currentSessionCards = allData.filter(item => item.date === activeNoteDay).sort(() => Math.random() - 0.5);
@@ -151,7 +133,7 @@
 
         function showCard() {
             const data = currentSessionCards[currentIndex];
-            document.getElementById('header').innerText = `Card ${currentIndex + 1}/${currentSessionCards.length}`;
+            document.getElementById('header').innerText = `Testing: ${currentIndex + 1}/${currentSessionCards.length}`;
             document.getElementById('front-text').innerText = data.chinese;
             document.getElementById('back-text').innerText = data.english;
             document.getElementById('card').classList.remove('flipped');
@@ -169,22 +151,50 @@
         function showReminder() {
             document.getElementById('card-container').style.display = 'none';
             document.getElementById('controls').style.display = 'none';
+            document.getElementById('header').innerText = "Test Results";
+            
             const start = new Date(activeNoteDay);
             const today = new Date(); today.setHours(0,0,0,0);
             const diff = Math.floor((today - start) / (1000 * 60 * 60 * 24));
             const accuracy = ((yesCount / currentSessionCards.length) * 100).toFixed(0);
 
-            let tableHTML = `<table><tr><th>Test</th><th>Lag</th><th>Acc.</th></tr>`;
+            // TRACKER LOGIC
+            let tableHTML = `<table>
+                <tr>
+                    <th># test</th>
+                    <th>days lag</th>
+                    <th>test day</th>
+                    <th>if tested</th>
+                    <th>accuracy</th>
+                </tr>`;
+
             intervals.forEach((days, i) => {
+                const testDate = new Date(start);
+                testDate.setDate(start.getDate() + days);
                 const isCurrent = (diff === days);
-                tableHTML += `<tr ${isCurrent ? 'class="highlight-row"' : ''}>
-                    <td>#${i+1}</td><td>${days}d</td><td>${isCurrent ? accuracy + "%" : (diff > days ? "✓" : "")}</td></tr>`;
+                const isPast = (diff > days);
+                
+                let rowClass = isCurrent ? 'class="highlight-row"' : '';
+                let status = isCurrent ? "Tested" : (isPast ? "Complete" : "Pending");
+                let accDisp = isCurrent ? `<strong>${accuracy}%</strong>` : "";
+
+                tableHTML += `<tr ${rowClass}>
+                    <td>${i + 1}</td>
+                    <td>${days} days</td>
+                    <td>${testDate.getMonth()+1}/${testDate.getDate()}/${testDate.getFullYear()}</td>
+                    <td>${status}</td>
+                    <td>${accDisp}</td>
+                </tr>`;
             });
             tableHTML += `</table>`;
 
             const reminderDiv = document.getElementById('reminder');
             reminderDiv.style.display = 'block';
-            reminderDiv.innerHTML = `<strong>Summary</strong>${tableHTML}<br><button onclick="location.reload()" style="background:#444; color:white; padding:10px; border-radius:8px; border:none; width:100%;">Menu</button>`;
+            reminderDiv.innerHTML = `
+                <div style="text-align:center; font-weight:bold; margin-bottom:10px;">Ebbinghaus Tracker</div>
+                ${tableHTML}
+                <button onclick="location.reload()" style="background:#444; color:white; padding:15px; border-radius:10px; border:none; width:100%; margin-top:20px; font-size:16px;">Return to Menu</button>
+            `;
         }
     </script>
 </body>
