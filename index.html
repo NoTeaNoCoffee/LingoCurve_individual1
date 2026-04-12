@@ -13,26 +13,26 @@
     <style>
         :root { --primary: #4CAF50; --secondary: #f44336; --bg: #f9f9f9; }
         body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        
-        /* FEATURE: Last Updated Style */
         #status-bar { font-size: 11px; color: #999; margin-bottom: 10px; text-align: center; font-family: monospace; }
-        
         #header { margin-bottom: 15px; font-weight: bold; color: #555; text-align: center; }
         #selector-container { margin-bottom: 20px; text-align: center; width: 100%; }
         select { padding: 12px; border-radius: 8px; border: 1px solid #ddd; font-size: 16px; background: white; width: 85%; max-width: 300px; -webkit-appearance: none; }
-        
         #card-container { width: 100%; max-width: 400px; height: 250px; perspective: 1000px; display: none; }
         .card { width: 100%; height: 100%; position: relative; transition: transform 0.4s; transform-style: preserve-3d; border: 1px solid #ddd; border-radius: 12px; background: white; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
         .card.flipped { transform: rotateY(180deg); }
         .card-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; align-items: center; justify-content: center; font-size: 24px; padding: 20px; box-sizing: border-box; text-align: center; }
         .card-back { transform: rotateY(180deg); background-color: #fffdf5; }
-        
         #controls { margin-top: 30px; display: none; gap: 20px; width: 100%; max-width: 400px; }
         button { flex: 1; padding: 18px; border: none; border-radius: 12px; color: white; font-size: 18px; font-weight: bold; cursor: pointer; }
         .yes-btn { background-color: var(--primary); }
         .no-btn { background-color: var(--secondary); }
-        #reminder { display: none; text-align: center; font-size: 18px; margin-top: 50px; line-height: 1.6; color: #333; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
-        .review-date { color: var(--secondary); font-weight: bold; }
+        
+        /* Tracker Table Style */
+        #reminder { display: none; text-align: center; font-size: 16px; margin-top: 20px; width: 100%; max-width: 500px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; font-size: 12px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        th { background-color: #f2f2f2; }
+        .highlight-row { background-color: #e8f5e9; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -54,8 +54,8 @@
     </div>
 
     <div id="controls">
-        <button class="yes-btn" onclick="nextCard()">Yes</button>
-        <button class="no-btn" onclick="nextCard()">No</button>
+        <button class="yes-btn" onclick="recordAnswer(true)">Yes</button>
+        <button class="no-btn" onclick="recordAnswer(false)">No</button>
     </div>
 
     <div id="reminder"></div>
@@ -66,17 +66,17 @@
         let currentSessionCards = [];
         let currentIndex = 0;
         let activeNoteDay = null;
+        let yesCount = 0; // NEW: Tracker variable
 
-        // FEATURE: Ebbinghaus Interval Logic
-        const intervals = [1, 2, 4, 7, 14, 28, 90];
+        const intervals = [1, 2, 4, 7, 14, 28, 90]; [cite: 120]
 
         function formatDate(dateStr) {
             const date = new Date(dateStr);
-            if (isNaN(date)) return dateStr.trim();
+            if (isNaN(date)) return dateStr.trim(); [cite: 122]
             const y = date.getFullYear();
             const m = String(date.getMonth() + 1).padStart(2, '0');
             const d = String(date.getDate()).padStart(2, '0');
-            return `${y}-${m}-${d}`;
+            return `${y}-${m}-${d}`; [cite: 123]
         }
 
         Papa.parse(CSV_FILE, {
@@ -84,23 +84,22 @@
             header: false,
             skipEmptyLines: true,
             complete: function(results) {
-                // FEATURE: Last Updated Timestamp
-                const now = new Date();
+                const now = new Date(); [cite: 124]
                 document.getElementById('status-bar').innerText = `UPDATED: ${now.toLocaleDateString()} ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
 
                 allData = results.data.slice(1)
                     .filter(row => row[1] && row[2]) 
                     .map(row => ({
-                        date: formatDate(row[0]),
+                        date: formatDate(row[0]), [cite: 125]
                         chinese: row[1].trim(),
                         english: row[2].trim()
                     }));
                 
-                const uniqueDates = [...new Set(allData.map(item => item.date))].sort((a, b) => b.localeCompare(a));
+                const uniqueDates = [...new Set(allData.map(item => item.date))].sort((a, b) => b.localeCompare(a)); [cite: 126]
                 const selector = document.getElementById('date-selector');
                 uniqueDates.forEach(date => {
                     let option = document.createElement('option');
-                    option.value = date;
+                    option.value = date; [cite: 127]
                     option.text = date;
                     selector.appendChild(option);
                 });
@@ -109,12 +108,13 @@
         });
 
         function startSession() {
-            activeNoteDay = document.getElementById('date-selector').value;
+            activeNoteDay = document.getElementById('date-selector').value; [cite: 129]
             if (!activeNoteDay) return;
             currentSessionCards = allData
                 .filter(item => item.date === activeNoteDay)
-                .sort(() => Math.random() - 0.5); // Random Order [cite: 19]
+                .sort(() => Math.random() - 0.5); [cite: 130]
             currentIndex = 0;
+            yesCount = 0; // Reset tracker
             document.getElementById('selector-container').style.display = 'none';
             document.getElementById('status-bar').style.display = 'none';
             document.getElementById('card-container').style.display = 'block';
@@ -123,19 +123,20 @@
 
         function showCard() {
             const currentData = currentSessionCards[currentIndex];
-            document.getElementById('header').innerText = `${currentData.date} (${currentIndex + 1}/${currentSessionCards.length})`;
-            document.getElementById('front-text').innerText = currentData.chinese; // Default Chinese [cite: 13]
-            document.getElementById('back-text').innerText = currentData.english;  // Flip for English [cite: 14]
+            document.getElementById('header').innerText = `${currentData.date} (${currentIndex + 1}/${currentSessionCards.length})`; [cite: 133]
+            document.getElementById('front-text').innerText = currentData.chinese; [cite: 133]
+            document.getElementById('back-text').innerText = currentData.english; [cite: 133]
             document.getElementById('card').classList.remove('flipped');
             document.getElementById('controls').style.display = 'none';
         }
 
         function flipCard() {
             document.getElementById('card').classList.add('flipped');
-            document.getElementById('controls').style.display = 'flex'; // Show Yes/No [cite: 15]
+            document.getElementById('controls').style.display = 'flex'; [cite: 136]
         }
 
-        function nextCard() {
+        function recordAnswer(isYes) {
+            if (isYes) yesCount++; // NEW: Increment tracker
             currentIndex++;
             if (currentIndex < currentSessionCards.length) {
                 showCard();
@@ -144,34 +145,54 @@
             }
         }
 
-        // FEATURE: Dynamic Ebbinghaus Reminder Calculation
         function showReminder() {
-            document.getElementById('card-container').style.display = 'none';
-            document.getElementById('controls').style.display = 'none';
+            document.getElementById('card-container').style.display = 'none'; [cite: 140]
+            document.getElementById('controls').style.display = 'none'; [cite: 140]
             document.getElementById('header').style.display = 'none';
             
             const start = new Date(activeNoteDay);
             const today = new Date();
-            const diffDays = Math.floor((today - start) / (1000 * 60 * 60 * 24));
+            const diffDays = Math.floor((today - start) / (1000 * 60 * 60 * 24)); [cite: 141]
             
-            // Find the next scheduled test day
-            let nextInterval = intervals.find(days => days > diffDays);
-            let nextDate = new Date(start);
-            
-            let message = "";
-            if (nextInterval) {
-                nextDate.setDate(start.getDate() + nextInterval);
-                message = `Your next review for this set is scheduled for:<br><span class="review-date">${nextDate.toDateString()}</span><br>(Review Day ${intervals.indexOf(nextInterval) + 1})`;
-            } else {
-                message = "Congratulations! You have finished the 90-day Ebbinghaus cycle for this set.";
-            }
+            // Calculate accuracy rate
+            const accuracy = ((yesCount / currentSessionCards.length) * 100).toFixed(0);
+
+            // Generate the Tracker Table
+            let tableHTML = `<table>
+                <tr>
+                    <th># test</th>
+                    <th>days lag</th>
+                    <th>test day</th>
+                    <th>if tested</th>
+                    <th>accuracy</th>
+                </tr>`;
+
+            intervals.forEach((days, index) => {
+                let testDate = new Date(start);
+                testDate.setDate(start.getDate() + days);
+                
+                // Determine if this is the test we just completed
+                const isCurrentTest = (diffDays >= days && (index === intervals.length - 1 || diffDays < intervals[index+1]));
+                const rowClass = isCurrentTest ? 'class="highlight-row"' : '';
+                const ifTested = isCurrentTest ? "Yes" : (diffDays > days ? "Completed" : "");
+                const accVal = isCurrentTest ? accuracy + "%" : "";
+
+                tableHTML += `<tr ${rowClass}>
+                    <td>${index + 1}</td>
+                    <td>${days}</td>
+                    <td>${testDate.toLocaleDateString()}</td>
+                    <td>${ifTested}</td>
+                    <td>${accVal}</td>
+                </tr>`;
+            });
+            tableHTML += `</table>`;
 
             const reminderDiv = document.getElementById('reminder');
             reminderDiv.style.display = 'block';
             reminderDiv.innerHTML = `
-                <strong>Session Complete!</strong><br><br>
-                ${message}<br><br>
-                <button onclick="location.reload()" style="background:#444; width:auto; padding:12px 24px;">Back to Menu</button>
+                <strong>Session Summary</strong><br>
+                ${tableHTML}<br>
+                <button onclick="location.reload()" style="background:#444; width:auto; padding:12px 24px; color:white; border-radius:8px; border:none;">Back to Menu</button>
             `;
         }
     </script>
