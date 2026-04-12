@@ -71,7 +71,9 @@
         const CSV_FILE = 'glossary.csv?v=' + new Date().getTime(); 
         let allData = [];
         let currentSessionCards = [];
-        let currentIndex = 0, yesCount = 0, activeNoteDay = null;
+        let currentIndex = 0;
+        let yesCount = 0; // Tracking Yes responses
+        let activeNoteDay = null;
         const intervals = [1, 2, 4, 7, 14, 28, 90];
 
         function formatDate(dateStr) {
@@ -118,11 +120,16 @@
         function startSession() {
             activeNoteDay = document.getElementById('date-selector').value;
             if (!activeNoteDay) return;
+            
+            // RESET Session State
+            yesCount = 0;
+            currentIndex = 0;
+            
             document.getElementById('notification-box').style.display = 'none';
             document.getElementById('selector-container').style.display = 'none';
             document.getElementById('card-container').style.display = 'block';
+            
             currentSessionCards = allData.filter(item => item.date === activeNoteDay).sort(() => Math.random() - 0.5);
-            currentIndex = 0; yesCount = 0;
             showCard();
         }
 
@@ -135,12 +142,21 @@
             document.getElementById('controls').style.display = 'none';
         }
 
-        function flipCard() { document.getElementById('card').classList.add('flipped'); document.getElementById('controls').style.display = 'flex'; }
+        function flipCard() { 
+            document.getElementById('card').classList.add('flipped'); 
+            document.getElementById('controls').style.display = 'flex'; 
+        }
 
         function recordAnswer(isYes) {
-            if (isYes) yesCount++; // Count the "Yes" clicks
+            if (isYes === true) {
+                yesCount++;
+            }
             currentIndex++;
-            if (currentIndex < currentSessionCards.length) showCard(); else showReminder();
+            if (currentIndex < currentSessionCards.length) {
+                showCard();
+            } else {
+                showReminder();
+            }
         }
 
         function showReminder() {
@@ -149,11 +165,13 @@
             document.getElementById('header').innerText = "Test Results";
             
             const start = new Date(activeNoteDay);
-            const today = new Date(); today.setHours(0,0,0,0);
+            const today = new Date(); 
+            today.setHours(0,0,0,0);
+            
             const diff = Math.floor((today - start) / (1000 * 60 * 60 * 24));
             
-            // FIXED: Calculation logic
-            const accuracy = ((yesCount / currentSessionCards.length) * 100).toFixed(0);
+            // Ensure accuracy is calculated correctly [Yes / Total * 100]
+            const calcAccuracy = Math.round((yesCount / currentSessionCards.length) * 100);
 
             let tableHTML = `<table>
                 <tr>
@@ -168,22 +186,22 @@
                 const testDate = new Date(start);
                 testDate.setDate(start.getDate() + days);
                 
-                // Matches current day lag to the Ebbinghaus stage
-                const isCurrent = (diff === days);
-                const isPast = (diff > days);
+                // Check if this row is the "current" test based on day lag
+                const isCurrent = (diff >= days && (i === intervals.length - 1 || diff < intervals[i+1]));
+                const isPast = (diff > days && !isCurrent);
                 
                 let rowClass = isCurrent ? 'class="highlight-row"' : '';
                 let status = isCurrent ? "Tested" : (isPast ? "Complete" : "Pending");
                 
-                // Only show the score for the current stage we just finished
-                let accVal = isCurrent ? `<strong>${accuracy}%</strong>` : "";
+                // Show percentage ONLY on the "Tested" (active) row
+                let accDisplay = isCurrent ? `<strong>${calcAccuracy}%</strong>` : "";
 
                 tableHTML += `<tr ${rowClass}>
                     <td>${i + 1}</td>
                     <td>${days} days</td>
                     <td>${testDate.getMonth()+1}/${testDate.getDate()}/${testDate.getFullYear()}</td>
                     <td>${status}</td>
-                    <td>${accVal}</td>
+                    <td>${accDisplay}</td>
                 </tr>`;
             });
             tableHTML += `</table>`;
